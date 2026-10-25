@@ -72,7 +72,8 @@
       margin-bottom: 28px;
     }
 
-    form.panel { transform: rotate(0.6deg); transition: background 0.3s; }
+    /* z-index keeps the tag suggestions dropdown above the (also transformed) bookmark cards. */
+    form.panel { position: relative; z-index: 2; transform: rotate(0.6deg); transition: background 0.3s; }
     form.panel.editing { background: #e6fff6; }
 
     .form-title {
@@ -161,6 +162,7 @@
       border-radius: 12px;
       background: #fffdf5;
       cursor: text;
+      position: relative;
       transition: transform 0.15s, box-shadow 0.15s;
     }
 
@@ -169,17 +171,84 @@
       box-shadow: 4px 4px 0 var(--pink);
     }
 
-    .tag-field input {
-      flex: 1;
-      width: auto;
-      min-width: 12ch;
-      margin: 0;
+    .tag-input-wrap { position: relative; flex: 1; min-width: 12ch; }
+
+    /* The ghost sits behind the transparent input and must share its font metrics. */
+    .tag-field input,
+    .tag-ghost {
+      font: inherit;
+      line-height: 1.5;
       padding: 4px;
+    }
+
+    .tag-field input {
+      position: relative;
+      width: 100%;
+      margin: 0;
       border: none;
       background: transparent;
     }
 
     .tag-field input:focus { transform: none; box-shadow: none; }
+
+    .tag-ghost {
+      position: absolute;
+      inset: 0;
+      white-space: pre;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .ghost-typed { color: transparent; }
+    .ghost-rest { opacity: 0.4; }
+
+    .ghost-key {
+      margin-left: 6px;
+      padding: 0 6px;
+      font-size: 0.75rem;
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+      opacity: 0.5;
+      vertical-align: 2px;
+    }
+
+    .tag-suggestions {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: -3px;
+      right: -3px;
+      z-index: 10;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 4px;
+      background: var(--card);
+      border: 3px solid var(--ink);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      animation: drop-down 0.15s ease-out;
+    }
+
+    .suggestion {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .suggestion:hover { background: #fff0f7; }
+    .suggestion.active { background: var(--sun); }
+    .suggestion strong { font-weight: 700; }
+    .suggestion .rest { font-weight: 400; }
+
+    .swatch {
+      flex-shrink: 0;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+    }
 
     .tags { display: flex; flex-wrap: wrap; gap: 6px; }
     .tags:empty { display: none; }
@@ -364,6 +433,9 @@
     @keyframes poof {
       to { opacity: 0; transform: scale(0.4) rotate(12deg); }
     }
+    @keyframes drop-down {
+      from { opacity: 0; transform: translateY(-6px); }
+    }
     @keyframes wiggle {
       0%, 100% { transform: rotate(-8deg); }
       50% { transform: rotate(8deg); }
@@ -395,7 +467,12 @@
       <label for="tag-input">Categories</label>
       <div class="tag-field" id="tag-field">
         <ul class="tags" id="form-tags"></ul>
-        <input id="tag-input" type="text" placeholder="type a tag, press Enter" autocomplete="off" />
+        <div class="tag-input-wrap">
+          <span class="tag-ghost" aria-hidden="true"><span class="ghost-typed" id="ghost-typed"></span><span class="ghost-rest" id="ghost-rest"></span><span class="ghost-key" id="ghost-key" hidden>tab ⇥</span></span>
+          <input id="tag-input" type="text" placeholder="type a tag, press Enter" autocomplete="off"
+            role="combobox" aria-autocomplete="both" aria-expanded="false" aria-controls="tag-suggestions" />
+        </div>
+        <ul class="tag-suggestions" id="tag-suggestions" role="listbox" aria-label="Existing categories" hidden></ul>
       </div>
       <p class="error" id="error" role="alert"></p>
       <div class="buttons">
@@ -436,12 +513,18 @@
     const tagField = document.getElementById("tag-field");
     const tagInput = document.getElementById("tag-input");
     const formTagsEl = document.getElementById("form-tags");
+    const tagSuggestionsEl = document.getElementById("tag-suggestions");
+    const ghostTyped = document.getElementById("ghost-typed");
+    const ghostRest = document.getElementById("ghost-rest");
+    const ghostKey = document.getElementById("ghost-key");
     const groupToggle = document.getElementById("group-toggle");
     const GROUP_PREF_KEY = "bookmark-burrow:group-by-category";
 
     let bookmarks = loadBookmarks();
     let editingId = null;
     let formTags = [];
+    let suggestions = [];
+    let activeSuggestion = -1; // index into suggestions; -1 means none highlighted
 
     function loadBookmarks() {
       try {
@@ -619,9 +702,105 @@
         renderFormTags();
         tagInput.focus();
       })));
+      updateSuggestions();
+    }
+
+    // Suggest existing tags that start with what's typed (see docs/adr/0006).
+    // One match shows as inline ghost text; several show as a dropdown.
+    function updateSuggestions() {
+      const typed = normalizeTag(tagInput.value);
+      const existing = [...new Set(bookmarks.flatMap(bm => bm.tags || []))].sort();
+      suggestions = typed
+        ? existing.filter(tag => tag.startsWith(typed) && !formTags.includes(tag))
+        : [];
+      // Nothing left to complete if the only match is exactly what's typed.
+      if (suggestions.length === 1 && suggestions[0] === typed) suggestions = [];
+      activeSuggestion = -1;
+      renderSuggestions();
+    }
+
+    function clearSuggestions() {
+      suggestions = [];
+      activeSuggestion = -1;
+      renderSuggestions();
+    }
+
+    function renderSuggestions() {
+      const single = suggestions.length === 1;
+      ghostTyped.textContent = single ? tagInput.value : "";
+      ghostRest.textContent = single ? suggestions[0].slice(normalizeTag(tagInput.value).length) : "";
+      ghostKey.hidden = !single;
+
+      const showList = suggestions.length > 1;
+      tagSuggestionsEl.hidden = !showList;
+      tagInput.setAttribute("aria-expanded", String(showList));
+      if (showList && activeSuggestion >= 0) {
+        tagInput.setAttribute("aria-activedescendant", `tag-option-${activeSuggestion}`);
+      } else {
+        tagInput.removeAttribute("aria-activedescendant");
+      }
+      if (!showList) {
+        tagSuggestionsEl.replaceChildren();
+        return;
+      }
+
+      const typedLength = normalizeTag(tagInput.value).length;
+      tagSuggestionsEl.replaceChildren(...suggestions.map((tag, i) => {
+        const li = document.createElement("li");
+        li.id = `tag-option-${i}`;
+        li.className = "suggestion" + (i === activeSuggestion ? " active" : "");
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", String(i === activeSuggestion));
+        const swatch = document.createElement("span");
+        swatch.className = "swatch";
+        swatch.style.background = TAG_COLORS[hashString(tag) % TAG_COLORS.length];
+        const match = document.createElement("strong");
+        match.textContent = tag.slice(0, typedLength);
+        const rest = document.createElement("span");
+        rest.className = "rest";
+        rest.textContent = tag.slice(typedLength);
+        li.append(swatch, match, rest);
+        // mousedown (not click) so the input never loses focus.
+        li.addEventListener("mousedown", e => {
+          e.preventDefault();
+          addTags(tag);
+        });
+        return li;
+      }));
+      tagSuggestionsEl.querySelector(".active")?.scrollIntoView({ block: "nearest" });
     }
 
     tagInput.addEventListener("keydown", e => {
+      const count = suggestions.length;
+      if (count > 1 && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        // Cycle through the options plus a "nothing highlighted" slot.
+        e.preventDefault();
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        activeSuggestion = ((activeSuggestion + 1 + step + count + 1) % (count + 1)) - 1;
+        renderSuggestions();
+        return;
+      }
+      if (count && e.key === "Escape") {
+        e.preventDefault();
+        clearSuggestions();
+        return;
+      }
+      if (count && e.key === "Tab" && !e.shiftKey) {
+        e.preventDefault();
+        addTags(suggestions[Math.max(activeSuggestion, 0)]);
+        return;
+      }
+      if (count === 1 && e.key === "ArrowRight" && tagInput.selectionStart === tagInput.value.length) {
+        e.preventDefault();
+        addTags(suggestions[0]);
+        return;
+      }
+      if (e.key === "Enter" && activeSuggestion >= 0) {
+        e.preventDefault();
+        addTags(suggestions[activeSuggestion]);
+        return;
+      }
+
       // Enter in an empty tag box falls through and submits the form.
       if ((e.key === "Enter" && tagInput.value.trim()) || e.key === ",") {
         e.preventDefault();
@@ -635,7 +814,11 @@
     // Handles pasted "a, b, c" lists.
     tagInput.addEventListener("input", () => {
       if (tagInput.value.includes(",")) addTags(tagInput.value);
+      else updateSuggestions();
     });
+
+    tagInput.addEventListener("focus", updateSuggestions);
+    tagInput.addEventListener("blur", clearSuggestions);
 
     tagField.addEventListener("click", e => {
       if (e.target === tagField || e.target === formTagsEl) tagInput.focus();

@@ -10,6 +10,7 @@ Short records of the significant decisions made for Bookmark Burrow, in the
 | 0003 | [Drag-and-drop titles come from drag data only; no network fetch](0003-drag-drop-titles-local-only.md) | Accepted |
 | 0004 | [Categories are free-form lower-case tags](0004-lowercase-category-tags.md) | Accepted |
 | 0005 | [Optional group-by-category view, with bookmarks repeated per tag](0005-group-by-category-view.md) | Accepted |
+| 0006 | [Tag autocomplete from existing categories](0006-tag-autocomplete.md) | Accepted |
 
 To add a record, copy the structure of an existing one, use the next number,
 and add a row above. Superseded records stay in place with their status updated.

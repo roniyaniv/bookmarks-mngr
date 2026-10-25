@@ -28,5 +28,6 @@ in the form and next to each bookmark in the list.
 
 - No list of categories to maintain; users invent tags as they go.
 - Near-duplicates (`recipe` vs `recipes`) are possible because tags are free-form.
-- There's no filtering or tag autocomplete yet. Tags can be used to group the
-  list ([0005](0005-group-by-category-view.md)).
+- There's no filtering yet. Tags can be used to group the list
+  ([0005](0005-group-by-category-view.md)), and existing tags are offered as
+  autocomplete suggestions ([0006](0006-tag-autocomplete.md)).

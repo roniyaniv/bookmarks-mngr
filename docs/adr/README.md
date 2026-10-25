@@ -11,6 +11,7 @@ Short records of the significant decisions made for Bookmark Burrow, in the
 | 0004 | [Categories are free-form lower-case tags](0004-lowercase-category-tags.md) | Accepted |
 | 0005 | [Optional group-by-category view, with bookmarks repeated per tag](0005-group-by-category-view.md) | Accepted |
 | 0006 | [Tag autocomplete from existing categories](0006-tag-autocomplete.md) | Accepted |
+| 0007 | [Live text filter across title, URL, and tags](0007-live-text-filter.md) | Accepted |
 
 To add a record, copy the structure of an existing one, use the next number,
 and add a row above. Superseded records stay in place with their status updated.

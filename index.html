@@ -332,6 +332,46 @@
       background: var(--mint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3 7-7' fill='none' stroke='%232b1d3a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
     }
 
+    .search-box { position: relative; margin-bottom: 8px; transform: rotate(-0.4deg); }
+
+    .search-box input {
+      -webkit-appearance: none;
+      appearance: none;
+      padding-left: 42px;
+      padding-right: 40px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      pointer-events: none;
+    }
+
+    .search-key {
+      position: absolute;
+      right: 14px;
+      top: 9px;
+      padding: 0 8px;
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    #filter:focus ~ .search-key,
+    #filter:not(:placeholder-shown) ~ .search-key { display: none; }
+
+    mark {
+      background: var(--sun);
+      color: inherit;
+      border-radius: 4px;
+      padding: 0 1px;
+    }
+
     li.group { margin-bottom: 28px; }
 
     .group-header {
@@ -492,6 +532,11 @@
           <span class="count" id="count">0</span>
         </div>
       </div>
+      <div class="search-box">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="filter" type="search" placeholder="Sniff through your stash (title, URL or tag)" autocomplete="off" aria-label="Filter bookmarks" />
+        <kbd class="search-key" aria-hidden="true">/</kbd>
+      </div>
       <ul id="bookmark-list"></ul>
     </section>
   </main>
@@ -518,6 +563,7 @@
     const ghostRest = document.getElementById("ghost-rest");
     const ghostKey = document.getElementById("ghost-key");
     const groupToggle = document.getElementById("group-toggle");
+    const filterInput = document.getElementById("filter");
     const GROUP_PREF_KEY = "bookmark-burrow:group-by-category";
 
     let bookmarks = loadBookmarks();
@@ -525,6 +571,7 @@
     let formTags = [];
     let suggestions = [];
     let activeSuggestion = -1; // index into suggestions; -1 means none highlighted
+    let filterWords = []; // lower-cased words from the filter box; empty means show everything
 
     function loadBookmarks() {
       try {
@@ -583,7 +630,8 @@
 
     function render() {
       list.innerHTML = "";
-      countEl.textContent = bookmarks.length;
+      const visible = filterWords.length ? bookmarks.filter(matchesFilter) : bookmarks;
+      countEl.textContent = filterWords.length ? `${visible.length} / ${bookmarks.length}` : bookmarks.length;
 
       if (bookmarks.length === 0) {
         const empty = document.createElement("li");
@@ -593,12 +641,21 @@
         return;
       }
 
-      if (!groupToggle.checked) {
-        list.append(...bookmarks.map(bm => createBookmarkItem(bm)));
+      if (visible.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.innerHTML = '<span class="big">🔍</span>';
+        empty.append(`Nothing in the burrow matches "${filterInput.value.trim()}"`);
+        list.appendChild(empty);
         return;
       }
 
-      for (const [tag, items] of groupByTag(bookmarks)) {
+      if (!groupToggle.checked) {
+        list.append(...visible.map(bm => createBookmarkItem(bm)));
+        return;
+      }
+
+      for (const [tag, items] of groupByTag(visible)) {
         const group = document.createElement("li");
         group.className = "group";
 
@@ -639,6 +696,42 @@
       return [...groups].sort(([a], [b]) => (a === null) - (b === null) || (a ?? "").localeCompare(b ?? ""));
     }
 
+    // Every filter word must appear (as a substring) in the title, URL, or one of the tags (see docs/adr/0007).
+    function matchesFilter(bm) {
+      const fields = [bm.title, bm.url, ...(bm.tags || [])].map(f => f.toLowerCase());
+      return filterWords.every(word => fields.some(f => f.includes(word)));
+    }
+
+    // Sets el's text, wrapping parts that match a filter word in <mark>.
+    function setHighlighted(el, text) {
+      const lower = text.toLowerCase();
+      // Some characters change length when lower-cased; skip highlighting rather than mis-mark.
+      if (!filterWords.length || lower.length !== text.length) {
+        el.textContent = text;
+        return;
+      }
+      const marked = new Array(text.length).fill(false);
+      for (const word of filterWords) {
+        for (let i = lower.indexOf(word); i !== -1; i = lower.indexOf(word, i + 1)) {
+          marked.fill(true, i, i + word.length);
+        }
+      }
+      el.replaceChildren();
+      for (let start = 0; start < text.length;) {
+        let end = start;
+        while (end < text.length && marked[end] === marked[start]) end++;
+        const chunk = text.slice(start, end);
+        if (marked[start]) {
+          const mark = document.createElement("mark");
+          mark.textContent = chunk;
+          el.appendChild(mark);
+        } else {
+          el.append(chunk);
+        }
+        start = end;
+      }
+    }
+
     function createBookmarkItem(bm) {
       const li = document.createElement("li");
       li.className = "bookmark" + (bm.id === editingId ? " highlight" : "");
@@ -654,15 +747,19 @@
       link.href = bm.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = bm.title;
+      setHighlighted(link, bm.title);
       const url = document.createElement("div");
       url.className = "url";
-      url.textContent = bm.url;
+      setHighlighted(url, bm.url);
       info.append(link, url);
       if (bm.tags?.length) {
         const tags = document.createElement("ul");
         tags.className = "tags";
-        tags.append(...bm.tags.map(tag => createTagPill(tag)));
+        tags.append(...bm.tags.map(tag => {
+          const pill = createTagPill(tag);
+          setHighlighted(pill.firstChild, tag);
+          return pill;
+        }));
         info.appendChild(tags);
       }
 
@@ -973,6 +1070,26 @@
         localStorage.setItem(GROUP_PREF_KEY, groupToggle.checked ? "1" : "0");
       } catch {}
       render();
+    });
+
+    filterInput.addEventListener("input", () => {
+      filterWords = filterInput.value.toLowerCase().split(/\s+/).filter(Boolean);
+      render();
+    });
+
+    filterInput.addEventListener("keydown", e => {
+      if (e.key === "Escape" && filterInput.value) {
+        filterInput.value = "";
+        filterInput.dispatchEvent(new Event("input"));
+      }
+    });
+
+    // "/" jumps to the filter box, unless the user is already typing somewhere.
+    document.addEventListener("keydown", e => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target.closest("input, textarea, [contenteditable]")) return;
+      e.preventDefault();
+      filterInput.focus();
     });
 
     render();

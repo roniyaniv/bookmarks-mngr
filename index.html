@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bookmark Burrow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fff4d6;
+      --ink: #2b1d3a;
+      --card: #ffffff;
+      --pink: #ff6fae;
+      --mint: #5ce1b9;
+      --sky: #6fb7ff;
+      --sun: #ffd23f;
+      --shadow: 5px 5px 0 var(--ink);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Fredoka", system-ui, sans-serif;
+      color: var(--ink);
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(var(--pink) 2px, transparent 2px),
+        radial-gradient(var(--sky) 2px, transparent 2px);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 20px;
+      padding: 32px 16px 64px;
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 7vw, 3.4rem);
+      margin: 0;
+      display: inline-block;
+      background: var(--sun);
+      padding: 6px 20px;
+      border: 3px solid var(--ink);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      transform: rotate(-2deg);
+    }
+
+    .tagline {
+      font-family: "Caveat", cursive;
+      font-size: 1.5rem;
+      margin: 14px 0 0;
+      transform: rotate(1deg);
+    }
+
+    .panel {
+      background: var(--card);
+      border: 3px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    form.panel { transform: rotate(0.6deg); transition: background 0.3s; }
+    form.panel.editing { background: #e6fff6; }
+
+    .form-title {
+      margin: 0 0 14px;
+      font-size: 1.3rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    input {
+      width: 100%;
+      font: inherit;
+      padding: 10px 14px;
+      border: 3px solid var(--ink);
+      border-radius: 12px;
+      margin-bottom: 14px;
+      background: #fffdf5;
+      color: var(--ink);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus {
+      outline: none;
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 var(--pink);
+    }
+
+    .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    button {
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      padding: 8px 18px;
+      box-shadow: 3px 3px 0 var(--ink);
+      transition: transform 0.1s, box-shadow 0.1s;
+      color: var(--ink);
+    }
+
+    button:hover { transform: translate(-1px, -1px) rotate(-2deg); box-shadow: 4px 4px 0 var(--ink); }
+    button:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+
+    .btn-primary { background: var(--pink); }
+    .btn-cancel { background: #eee; }
+    .btn-edit { background: var(--sky); padding: 6px 12px; }
+    .btn-delete { background: var(--sun); padding: 6px 12px; }
+
+    .drop-zone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      padding: 18px;
+      margin-bottom: 16px;
+      border: 3px dashed var(--ink);
+      border-radius: 16px;
+      background: repeating-linear-gradient(45deg, #fffdf5, #fffdf5 12px, #fff0f7 12px, #fff0f7 24px);
+      font-weight: 600;
+      transition: transform 0.15s, background 0.15s;
+    }
+
+    .drop-emoji { font-size: 1.8rem; }
+
+    .drop-zone.over {
+      background: var(--mint);
+      transform: scale(1.03) rotate(-1deg);
+      border-style: solid;
+    }
+
+    .drop-zone.over .drop-emoji { animation: wiggle 0.4s ease-in-out infinite; }
+    .tag-field {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      margin-bottom: 14px;
+      border: 3px solid var(--ink);
+      border-radius: 12px;
+      background: #fffdf5;
+      cursor: text;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .tag-field:focus-within {
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 var(--pink);
+    }
+
+    .tag-field input {
+      flex: 1;
+      width: auto;
+      min-width: 12ch;
+      margin: 0;
+      padding: 4px;
+      border: none;
+      background: transparent;
+    }
+
+    .tag-field input:focus { transform: none; box-shadow: none; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tags:empty { display: none; }
+    li.bookmark .tags { margin-top: 6px; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+    }
+
+    .tag-remove {
+      padding: 0 4px;
+      margin-right: -6px;
+      font-size: 1rem;
+      line-height: 1.2;
+      border: none;
+      border-radius: 50%;
+      box-shadow: none;
+      background: transparent;
+    }
+
+    .tag-remove:hover {
+      transform: rotate(90deg);
+      box-shadow: none;
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .error {
+      color: #c0124f;
+      font-weight: 600;
+      min-height: 1.2em;
+      margin: -6px 0 10px;
+    }
+
+    .list-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .list-header h2 { margin: 0; font-size: 1.5rem; }
+
+    .list-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .group-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .group-toggle input {
+      appearance: none;
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      margin: 0;
+      padding: 0;
+      border: 3px solid var(--ink);
+      border-radius: 8px;
+      background: #fffdf5;
+      cursor: pointer;
+    }
+
+    .group-toggle input:checked {
+      background: var(--mint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3 3 7-7' fill='none' stroke='%232b1d3a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+    }
+
+    li.group { margin-bottom: 28px; }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .group-header .tag {
+      font-size: 1.05rem;
+      padding: 3px 14px;
+      border-width: 3px;
+      box-shadow: 3px 3px 0 var(--ink);
+      transform: rotate(-2deg);
+    }
+
+    .tag-none { background: #eee; font-style: italic; }
+
+    .group-count { font-family: "Caveat", cursive; font-size: 1.4rem; }
+
+    .group-items {
+      padding-left: 14px;
+      border-left: 3px dashed var(--ink);
+    }
+
+    .count {
+      background: var(--mint);
+      border: 3px solid var(--ink);
+      border-radius: 999px;
+      padding: 2px 12px;
+      font-weight: 700;
+    }
+
+    ul { list-style: none; padding: 0; margin: 0; }
+
+    li.bookmark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 3px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      animation: pop-in 0.35s cubic-bezier(.2, 1.6, .5, 1);
+    }
+
+    li.bookmark:nth-child(odd) { transform: rotate(-0.8deg); }
+    li.bookmark:nth-child(even) { transform: rotate(0.8deg); }
+    li.bookmark.highlight { background: #e6fff6; }
+
+    .emoji { font-size: 1.8rem; flex-shrink: 0; }
+
+    .info { flex: 1; min-width: 0; }
+
+    .info a {
+      color: var(--ink);
+      font-weight: 700;
+      font-size: 1.1rem;
+      text-decoration: none;
+      background-image: linear-gradient(var(--pink), var(--pink));
+      background-size: 100% 4px;
+      background-position: 0 100%;
+      background-repeat: no-repeat;
+      transition: background-size 0.2s;
+      word-break: break-word;
+    }
+
+    .info a:hover { background-size: 100% 100%; }
+
+    .url {
+      font-size: 0.85rem;
+      opacity: 0.65;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .empty {
+      text-align: center;
+      font-family: "Caveat", cursive;
+      font-size: 1.6rem;
+      padding: 24px;
+    }
+
+    .empty .big { font-size: 3rem; display: block; animation: wiggle 2s ease-in-out infinite; }
+
+    li.bookmark.leaving { animation: poof 0.3s forwards; }
+
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(0.6) rotate(-6deg); }
+    }
+    @keyframes poof {
+      to { opacity: 0; transform: scale(0.4) rotate(12deg); }
+    }
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(-8deg); }
+      50% { transform: rotate(8deg); }
+    }
+
+    @media (max-width: 480px) {
+      li.bookmark { flex-wrap: wrap; }
+      .actions { width: 100%; justify-content: flex-end; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>🐿️ Bookmark Burrow</h1>
+      <p class="tagline">stash your favorite corners of the internet!</p>
+    </header>
+
+    <form id="bookmark-form" class="panel" novalidate>
+      <h2 class="form-title" id="form-title">✨ Stash a new link</h2>
+      <div class="drop-zone" id="drop-zone">
+        <span class="drop-emoji">🪤</span>
+        <span>Drag a link from your address bar and drop it here!</span>
+      </div>
+      <label for="title">Title</label>
+      <input id="title" type="text" placeholder="My favorite cat video" autocomplete="off" />
+      <label for="url">URL</label>
+      <input id="url" type="text" placeholder="example.com" autocomplete="off" />
+      <label for="tag-input">Categories</label>
+      <div class="tag-field" id="tag-field">
+        <ul class="tags" id="form-tags"></ul>
+        <input id="tag-input" type="text" placeholder="type a tag, press Enter" autocomplete="off" />
+      </div>
+      <p class="error" id="error" role="alert"></p>
+      <div class="buttons">
+        <button type="submit" class="btn-primary" id="submit-btn">Stash it! 🥜</button>
+        <button type="button" class="btn-cancel" id="cancel-btn" hidden>Never mind</button>
+      </div>
+    </form>
+
+    <section>
+      <div class="list-header">
+        <h2>Your stash</h2>
+        <div class="list-controls">
+          <label class="group-toggle">
+            <input type="checkbox" id="group-toggle" />
+            Group by category
+          </label>
+          <span class="count" id="count">0</span>
+        </div>
+      </div>
+      <ul id="bookmark-list"></ul>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "bookmark-burrow";
+    const EMOJIS = ["🌰", "🍄", "🌈", "🦄", "🍩", "🚀", "🐙", "🌵", "🎈", "🧁", "🪐", "🐸"];
+    const TAG_COLORS = ["#ffc2dd", "#b9f3e0", "#c4e1ff", "#ffe98a", "#e3ccff"];
+
+    const form = document.getElementById("bookmark-form");
+    const titleInput = document.getElementById("title");
+    const urlInput = document.getElementById("url");
+    const errorEl = document.getElementById("error");
+    const formTitle = document.getElementById("form-title");
+    const submitBtn = document.getElementById("submit-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
+    const list = document.getElementById("bookmark-list");
+    const countEl = document.getElementById("count");
+    const tagField = document.getElementById("tag-field");
+    const tagInput = document.getElementById("tag-input");
+    const formTagsEl = document.getElementById("form-tags");
+    const groupToggle = document.getElementById("group-toggle");
+    const GROUP_PREF_KEY = "bookmark-burrow:group-by-category";
+
+    let bookmarks = loadBookmarks();
+    let editingId = null;
+    let formTags = [];
+
+    function loadBookmarks() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveBookmarks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(bookmarks));
+    }
+
+    // Accept "example.com" by assuming https, and reject anything that isn't http(s).
+    function normalizeUrl(raw) {
+      const value = raw.trim();
+      if (!value) return null;
+      const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
+      try {
+        const url = new URL(withScheme);
+        if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+        return url.href;
+      } catch {
+        return null;
+      }
+    }
+
+    function hashString(str) {
+      let hash = 0;
+      for (const ch of str) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+      return hash;
+    }
+
+    function emojiFor(id) {
+      return EMOJIS[hashString(id) % EMOJIS.length];
+    }
+
+    function createTagPill(tag, onRemove, tagName = "li") {
+      const li = document.createElement(tagName);
+      li.className = "tag";
+      li.style.background = TAG_COLORS[hashString(tag) % TAG_COLORS.length];
+      const label = document.createElement("span");
+      label.textContent = tag;
+      li.appendChild(label);
+      if (onRemove) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "tag-remove";
+        remove.setAttribute("aria-label", `Remove ${tag}`);
+        remove.textContent = "×";
+        remove.addEventListener("click", onRemove);
+        li.appendChild(remove);
+      }
+      return li;
+    }
+
+    function render() {
+      list.innerHTML = "";
+      countEl.textContent = bookmarks.length;
+
+      if (bookmarks.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.innerHTML = '<span class="big">🕳️</span>Your burrow is empty... feed it some links!';
+        list.appendChild(empty);
+        return;
+      }
+
+      if (!groupToggle.checked) {
+        list.append(...bookmarks.map(bm => createBookmarkItem(bm)));
+        return;
+      }
+
+      for (const [tag, items] of groupByTag(bookmarks)) {
+        const group = document.createElement("li");
+        group.className = "group";
+
+        const header = document.createElement("h3");
+        header.className = "group-header";
+        let pill;
+        if (tag) {
+          pill = createTagPill(tag, null, "span");
+        } else {
+          pill = document.createElement("span");
+          pill.className = "tag tag-none";
+          pill.textContent = "no category";
+        }
+        const count = document.createElement("span");
+        count.className = "group-count";
+        count.textContent = items.length === 1 ? "1 link" : `${items.length} links`;
+        header.append(pill, count);
+
+        const groupList = document.createElement("ul");
+        groupList.className = "group-items";
+        groupList.append(...items.map(bm => createBookmarkItem(bm)));
+
+        group.append(header, groupList);
+        list.appendChild(group);
+      }
+    }
+
+    // A bookmark with several tags appears in each of their groups (see docs/adr/0005).
+    // Groups are alphabetical, with untagged bookmarks (key null) last.
+    function groupByTag(items) {
+      const groups = new Map();
+      for (const bm of items) {
+        for (const tag of bm.tags?.length ? bm.tags : [null]) {
+          if (!groups.has(tag)) groups.set(tag, []);
+          groups.get(tag).push(bm);
+        }
+      }
+      return [...groups].sort(([a], [b]) => (a === null) - (b === null) || (a ?? "").localeCompare(b ?? ""));
+    }
+
+    function createBookmarkItem(bm) {
+      const li = document.createElement("li");
+      li.className = "bookmark" + (bm.id === editingId ? " highlight" : "");
+      li.dataset.id = bm.id;
+
+      const emoji = document.createElement("span");
+      emoji.className = "emoji";
+      emoji.textContent = emojiFor(bm.id);
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const link = document.createElement("a");
+      link.href = bm.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = bm.title;
+      const url = document.createElement("div");
+      url.className = "url";
+      url.textContent = bm.url;
+      info.append(link, url);
+      if (bm.tags?.length) {
+        const tags = document.createElement("ul");
+        tags.className = "tags";
+        tags.append(...bm.tags.map(tag => createTagPill(tag)));
+        info.appendChild(tags);
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn-edit";
+      editBtn.dataset.action = "edit";
+      editBtn.textContent = "✏️ Edit";
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "btn-delete";
+      deleteBtn.dataset.action = "delete";
+      deleteBtn.textContent = "🗑️ Toss";
+      actions.append(editBtn, deleteBtn);
+
+      li.append(emoji, info, actions);
+      return li;
+    }
+
+    // Tags are lower-case, without a leading "#", and inner spaces become hyphens (see docs/adr/0004).
+    function normalizeTag(raw) {
+      return raw.trim().replace(/^#+/, "").toLowerCase().replace(/\s+/g, "-");
+    }
+
+    function addTags(raw) {
+      for (const part of raw.split(",")) {
+        const tag = normalizeTag(part);
+        if (tag && !formTags.includes(tag)) formTags.push(tag);
+      }
+      tagInput.value = "";
+      renderFormTags();
+    }
+
+    function renderFormTags() {
+      formTagsEl.replaceChildren(...formTags.map(tag => createTagPill(tag, () => {
+        formTags = formTags.filter(t => t !== tag);
+        renderFormTags();
+        tagInput.focus();
+      })));
+    }
+
+    tagInput.addEventListener("keydown", e => {
+      // Enter in an empty tag box falls through and submits the form.
+      if ((e.key === "Enter" && tagInput.value.trim()) || e.key === ",") {
+        e.preventDefault();
+        addTags(tagInput.value);
+      } else if (e.key === "Backspace" && !tagInput.value && formTags.length) {
+        formTags.pop();
+        renderFormTags();
+      }
+    });
+
+    // Handles pasted "a, b, c" lists.
+    tagInput.addEventListener("input", () => {
+      if (tagInput.value.includes(",")) addTags(tagInput.value);
+    });
+
+    tagField.addEventListener("click", e => {
+      if (e.target === tagField || e.target === formTagsEl) tagInput.focus();
+    });
+
+    function startEdit(id) {
+      const bm = bookmarks.find(b => b.id === id);
+      if (!bm) return;
+      editingId = id;
+      titleInput.value = bm.title;
+      urlInput.value = bm.url;
+      formTags = [...(bm.tags || [])];
+      renderFormTags();
+      formTitle.textContent = "🛠️ Tweak this link";
+      submitBtn.textContent = "Save changes 💾";
+      cancelBtn.hidden = false;
+      form.classList.add("editing");
+      errorEl.textContent = "";
+      render();
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      titleInput.focus();
+    }
+
+    function resetForm() {
+      editingId = null;
+      form.reset();
+      formTags = [];
+      renderFormTags();
+      formTitle.textContent = "✨ Stash a new link";
+      submitBtn.textContent = "Stash it! 🥜";
+      cancelBtn.hidden = true;
+      form.classList.remove("editing");
+      errorEl.textContent = "";
+      render();
+    }
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      addTags(tagInput.value); // keep a tag that was typed but not yet committed
+      const title = titleInput.value.trim();
+      const url = normalizeUrl(urlInput.value);
+
+      if (!title) {
+        errorEl.textContent = "Oops! Every link needs a name 🏷️";
+        titleInput.focus();
+        return;
+      }
+      if (!url) {
+        errorEl.textContent = "Hmm, that URL looks a bit squirrelly 🐿️";
+        urlInput.focus();
+        return;
+      }
+
+      if (editingId) {
+        const bm = bookmarks.find(b => b.id === editingId);
+        if (bm) Object.assign(bm, { title, url, tags: [...formTags] });
+      } else {
+        bookmarks.unshift({ id: crypto.randomUUID(), title, url, tags: [...formTags], createdAt: Date.now() });
+      }
+
+      saveBookmarks();
+      resetForm();
+    });
+
+    cancelBtn.addEventListener("click", resetForm);
+
+    const dropZone = document.getElementById("drop-zone");
+
+    // Stop the browser from navigating away when a link misses the drop zone.
+    window.addEventListener("dragover", e => e.preventDefault());
+    window.addEventListener("drop", e => e.preventDefault());
+
+    dropZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      dropZone.classList.add("over");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
+
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("over");
+      const { url, title } = readDroppedLink(e.dataTransfer);
+      const normalized = url && normalizeUrl(url);
+      if (!normalized) {
+        errorEl.textContent = "That didn't smell like a link 🤔 Try dragging from the address bar.";
+        return;
+      }
+
+      errorEl.textContent = "";
+      urlInput.value = normalized;
+      // Titles come only from the drag data; we never fetch the page (see docs/adr/0003).
+      titleInput.value = title || new URL(normalized).hostname;
+    });
+
+    // Browsers expose dragged links differently: Firefox sends "url\ntitle" as
+    // text/x-moz-url, Chrome and Safari often send an <a> in text/html.
+    function readDroppedLink(dt) {
+      const moz = dt.getData("text/x-moz-url");
+      if (moz) {
+        const [url, title] = moz.split("\n");
+        return { url, title: cleanTitle(title, url) };
+      }
+
+      const uriList = dt.getData("text/uri-list")
+        .split("\n").map(s => s.trim()).find(s => s && !s.startsWith("#"));
+      const url = uriList || dt.getData("text/plain").trim();
+
+      const html = dt.getData("text/html");
+      let title = "";
+      if (html) {
+        const a = new DOMParser().parseFromString(html, "text/html").querySelector("a");
+        title = a ? a.textContent : "";
+      }
+      return { url, title: cleanTitle(title, url) };
+    }
+
+    function cleanTitle(title, url) {
+      const t = (title || "").trim();
+      return t && t !== url ? t : "";
+    }
+
+    list.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const li = btn.closest("li.bookmark");
+      const id = li.dataset.id;
+
+      if (btn.dataset.action === "edit") {
+        startEdit(id);
+      } else if (btn.dataset.action === "delete") {
+        const bm = bookmarks.find(b => b.id === id);
+        if (!confirm(`Toss "${bm.title}" out of the burrow?`)) return;
+        // When grouped, the bookmark may be shown in several groups; poof them all.
+        list.querySelectorAll(`li.bookmark[data-id="${id}"]`).forEach(el => el.classList.add("leaving"));
+        li.addEventListener("animationend", () => {
+          bookmarks = bookmarks.filter(b => b.id !== id);
+          saveBookmarks();
+          if (editingId === id) resetForm();
+          else render();
+        }, { once: true });
+      }
+    });
+
+    // The grouping choice is a per-browser convenience; storage may be unavailable.
+    try {
+      groupToggle.checked = localStorage.getItem(GROUP_PREF_KEY) === "1";
+    } catch {}
+
+    groupToggle.addEventListener("change", () => {
+      try {
+        localStorage.setItem(GROUP_PREF_KEY, groupToggle.checked ? "1" : "0");
+      } catch {}
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
